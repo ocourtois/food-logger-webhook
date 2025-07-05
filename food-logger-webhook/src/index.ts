@@ -79,8 +79,9 @@ async function appendToGoogleSheets(entries: FoodLogEntry[], env: Env): Promise<
 		// Append rows to the spreadsheet
 		const response = await sheets.spreadsheets.values.append({
 			spreadsheetId: env.GOOGLE_SPREADSHEET_ID,
-			range: 'Sheet1!A2', // Start from row 2 (assuming row 1 has headers)
+			range: 'Log!A:L', // Use the correct sheet name
 			valueInputOption: 'USER_ENTERED',
+			insertDataOption: 'INSERT_ROWS', // Always insert new rows
 			requestBody: {
 				values: rows
 			}
@@ -117,7 +118,25 @@ async function transformTranscriptWithAI(transcript: string, apiKey: string): Pr
 	try {
 		const response = await client.responses.create({
 			model: 'gpt-4o',
-			instructions: `You are a food logging assistant. Transform the voice transcript into structured JSON data for food logging. Return only valid JSON respecting the following format. 
+			instructions: `You are a food logging assistant. Transform the voice transcript into structured JSON data for food logging. Return only valid JSON array of food log entries, each entry matching the following fields: 
+
+# Fields 
+[
+  {
+    "Date": "DD/MM/YYYY",
+    "Time": "HH:MM",
+    "Food": "List of foods eaten, multiline with bullet points",
+    "KeyIngredients": "List of ingredients, multiline with bullet points",
+    "Drinks": "List of drinks consumed, multiline with bullet points",
+    "BowelCount": "Number of bowel movements",
+    "BristolForm": "Bristol stool form scale, range from 1 to 7",
+    "BowelUrgency": "Urgency to defecate scale, range from 1 to 5",
+    "Pain": "Any discomfort or pain experienced, can be null",
+    "Stress": "Stress level or notes, can be null",
+    "Sleep": "Sleep duration or quality, can be null",
+    "Comments": "Additional observations or context, can be null"
+  }
+]
 
 #Rules
 - Usually a voice transcript will contain entries for 3 meals: breakfast, lunch, dinner 
@@ -126,72 +145,7 @@ async function transformTranscriptWithAI(transcript: string, apiKey: string): Pr
 - If one of the meal is absent from the transcript, **do not** create an entry
 - If the voice transcript is not related to any food logging, return an empty json
 - **Use today's date (${todayFormatted}) for all entries unless a different date is explicitly mentioned in the transcript**
-
-#Entry JsonFormat
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Food Log Entry",
-  "type": "object",
-  "properties": {
-    "Date": {
-      "type": "string",
-      "pattern": "^\\d{2}/\\d{2}/\\d{4}$",
-      "description": "Date in DD/MM/YYYY format"
-    },
-    "Time": {
-      "type": "string",
-      "pattern": "^\\d{1,2}:\\d{2}$",
-      "description": "Time in HH:MM format (24h)"
-    },
-    "Food": {
-      "type": "string",
-      "description": "List of foods eaten, multiline with bullet points"
-    },
-    "KeyIngredients": {
-      "type": "string",
-      "description": "List of ingredients, multiline with bullet points"
-    },
-    "Drinks": {
-      "type": "string",
-      "description": "List of drinks consumed, multiline with bullet points"
-    },
-    "BowelCount": {
-      "type": ["integer", "null"],
-      "minimum": 0,
-      "description": "Number of bowel movements"
-    },
-    "BristolForm": {
-      "type": ["integer", "null"],
-      "minimum": 1,
-      "maximum": 7,
-      "description": "Bristol stool form scale"
-    },
-    "BowelUrgency": {
-      "type": ["integer", "null"],
-      "minimum": 1,
-      "maximum": 5,
-      "description": "Urgency to defecate scale"
-    },
-    "Pain": {
-      "type": ["string", "null"],
-      "description": "Any discomfort or pain experienced"
-    },
-    "Stress": {
-      "type": ["string", "null"],
-      "description": "Stress level or notes"
-    },
-    "Sleep": {
-      "type": ["string", "null"],
-      "description": "Sleep duration or quality"
-    },
-    "Comments": {
-      "type": ["string", "null"],
-      "description": "Additional observations or context"
-    }
-  },
-  "required": ["Date", "Time"],
-  "additionalProperties": false
-}`,
+`,
 			input: `Transform this transcript into food log entries: "${transcript}"`,
 		});
 
